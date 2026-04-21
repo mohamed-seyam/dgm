@@ -153,3 +153,203 @@ class AttentionBlock(nn.Module):
         out = self.proj(out)
 
         return x + out
+
+class UNet(nn.Module):
+    """
+    U-Net backbone that predicts the noise ε_θ(x_t, t).
+
+    Architecture (CIFAR-10, Appendix B):
+        base_channels=128, channel_mult=(1,2,2,2)
+        Channels per level: 128, 256, 256, 256
+        Self-attention at 16×16 only
+        2 ResBlocks per encoder level, 3 per decoder level (extra one consumes
+        the downsampling skip), dropout=0.1
+        35.7 M parameters total
+    """
+
+    def __init__(
+        self,
+        img_channels: int = 3,
+        base_channels: int = 128,
+        dropout: float = 0.1,
+    ):
+        super().__init__()
+
+        C   = base_channels          # 128
+        C2  = base_channels * 2      # 256
+        T   = base_channels * 4      # 512 — time embedding dimension
+
+        # Appendix B: "sinusoidal position embedding projected through two FC layers"
+        self.time_mlp = nn.Sequential(
+            SinusoidalTimeEmbedding(C),
+            nn.Linear(C, T),
+            nn.SiLU(),
+            nn.Linear(T, T),
+        )
+
+        # Stem: 3×32×32 → 128×32×32
+        self.conv_in = nn.Conv2d(img_channels, C, kernel_size=3, padding=1)
+
+        # ── Encoder — Level 0  (32×32, 128 ch) ──────────────────────────────
+        self.enc0_res0 = ResidualBlock(C,  C,  T, dropout=dropout)
+        self.enc0_res1 = ResidualBlock(C,  C,  T, dropout=dropout)
+        self.enc0_down = nn.Conv2d(C, C, kernel_size=3, stride=2, padding=1)
+
+        # ── Encoder — Level 1  (16×16, 256 ch, self-attention) ──────────────
+        self.enc1_res0  = ResidualBlock(C,  C2, T, dropout=dropout)
+        self.enc1_attn0 = AttentionBlock(C2)
+        self.enc1_res1  = ResidualBlock(C2, C2, T, dropout=dropout)
+        self.enc1_attn1 = AttentionBlock(C2)
+        self.enc1_down  = nn.Conv2d(C2, C2, kernel_size=3, stride=2, padding=1)
+
+        # ── Encoder — Level 2  (8×8, 256 ch) ────────────────────────────────
+        self.enc2_res0 = ResidualBlock(C2, C2, T, dropout=dropout)
+        self.enc2_res1 = ResidualBlock(C2, C2, T, dropout=dropout)
+        self.enc2_down = nn.Conv2d(C2, C2, kernel_size=3, stride=2, padding=1)
+
+        # ── Encoder — Level 3  (4×4, 256 ch) ────────────────────────────────
+        self.enc3_res0 = ResidualBlock(C2, C2, T, dropout=dropout)
+        self.enc3_res1 = ResidualBlock(C2, C2, T, dropout=dropout)
+
+        # ── Bottleneck  (4×4, 256 ch): ResBlock → Self-Attn → ResBlock ──────
+        self.mid_res1 = ResidualBlock(C2, C2, T, dropout=dropout)
+        self.mid_attn = AttentionBlock(C2)
+        self.mid_res2 = ResidualBlock(C2, C2, T, dropout=dropout)
+
+        # ── Decoder — Level 3  (4×4 → 8×8) ─────────────────────────────────
+        # Receives skips 11, 10, 9 — all 256 ch → cat gives 512 ch input
+        self.dec3_res0 = ResidualBlock(C2 + C2, C2, T, dropout=dropout)
+        self.dec3_res1 = ResidualBlock(C2 + C2, C2, T, dropout=dropout)
+        self.dec3_res2 = ResidualBlock(C2 + C2, C2, T, dropout=dropout)
+        # Nearest-neighbour upsample + conv avoids checkerboard artifacts
+        self.dec3_up   = nn.Sequential(
+            nn.Upsample(scale_factor=2, mode="nearest"),
+            nn.Conv2d(C2, C2, kernel_size=3, padding=1),
+        )
+
+        # ── Decoder — Level 2  (8×8 → 16×16) ───────────────────────────────
+        # Receives skips 8, 7, 6 — all 256 ch
+        self.dec2_res0 = ResidualBlock(C2 + C2, C2, T, dropout=dropout)
+        self.dec2_res1 = ResidualBlock(C2 + C2, C2, T, dropout=dropout)
+        self.dec2_res2 = ResidualBlock(C2 + C2, C2, T, dropout=dropout)
+        self.dec2_up   = nn.Sequential(
+            nn.Upsample(scale_factor=2, mode="nearest"),
+            nn.Conv2d(C2, C2, kernel_size=3, padding=1),
+        )
+
+        # ── Decoder — Level 1  (16×16 → 32×32, self-attention) ──────────────
+        # Receives skips 5, 4 (256 ch → 512) and skip3 (128 ch → 384)
+        self.dec1_res0  = ResidualBlock(C2 + C2, C2, T, dropout=dropout)
+        self.dec1_attn0 = AttentionBlock(C2)
+        self.dec1_res1  = ResidualBlock(C2 + C2, C2, T, dropout=dropout)
+        self.dec1_attn1 = AttentionBlock(C2)
+        self.dec1_res2  = ResidualBlock(C2 + C,  C2, T, dropout=dropout)
+        self.dec1_attn2 = AttentionBlock(C2)
+        self.dec1_up    = nn.Sequential(
+            nn.Upsample(scale_factor=2, mode="nearest"),
+            nn.Conv2d(C2, C2, kernel_size=3, padding=1),
+        )
+
+        # ── Decoder — Level 0  (32×32, 128 ch) ──────────────────────────────
+        # Receives skips 2, 1, 0 — all 128 ch
+        self.dec0_res0 = ResidualBlock(C2 + C, C, T, dropout=dropout)
+        self.dec0_res1 = ResidualBlock(C  + C, C, T, dropout=dropout)
+        self.dec0_res2 = ResidualBlock(C  + C, C, T, dropout=dropout)
+
+        # Output head: GroupNorm → SiLU → Conv2d
+        self.norm_out = nn.GroupNorm(32, C)
+        self.conv_out = nn.Conv2d(C, img_channels, kernel_size=3, padding=1)
+
+    def forward(self, x: torch.Tensor, t: torch.Tensor) -> torch.Tensor:
+        """
+        Predict the noise ε_θ(x_t, t) added to the data at timestep t.
+
+        Args:
+            x : (B, 3, 32, 32)   noisy image x_t
+            t : (B,)              integer timestep indices (0-indexed)
+        Returns:
+            (B, 3, 32, 32)  predicted noise ε_θ
+        """
+        t_emb = self.time_mlp(t)           # (B, 512)
+
+        # ── Stem ─────────────────────────────────────────────────────────────
+        h     = self.conv_in(x)            # (B, 128, 32, 32)
+        skip0 = h
+
+        # ── Encoder — Level 0  (32×32) ───────────────────────────────────────
+        h     = self.enc0_res0(h, t_emb)
+        skip1 = h
+        h     = self.enc0_res1(h, t_emb)
+        skip2 = h
+        h     = self.enc0_down(h)          # (B, 128, 16, 16)
+        skip3 = h
+
+        # ── Encoder — Level 1  (16×16, attention) ────────────────────────────
+        h     = self.enc1_res0(h, t_emb)
+        h     = self.enc1_attn0(h)
+        skip4 = h
+        h     = self.enc1_res1(h, t_emb)
+        h     = self.enc1_attn1(h)
+        skip5 = h
+        h     = self.enc1_down(h)          # (B, 256,  8,  8)
+        skip6 = h
+
+        # ── Encoder — Level 2  (8×8) ─────────────────────────────────────────
+        h     = self.enc2_res0(h, t_emb)
+        skip7 = h
+        h     = self.enc2_res1(h, t_emb)
+        skip8 = h
+        h     = self.enc2_down(h)          # (B, 256,  4,  4)
+        skip9 = h
+
+        # ── Encoder — Level 3  (4×4) ─────────────────────────────────────────
+        h      = self.enc3_res0(h, t_emb)
+        skip10 = h
+        h      = self.enc3_res1(h, t_emb)
+        skip11 = h
+
+        # ── Bottleneck ───────────────────────────────────────────────────────
+        h = self.mid_res1(h, t_emb)
+        h = self.mid_attn(h)
+        h = self.mid_res2(h, t_emb)
+
+        # ── Decoder — Level 3  (4×4) ─────────────────────────────────────────
+        h = torch.cat([h, skip11], dim=1)
+        h = self.dec3_res0(h, t_emb)
+        h = torch.cat([h, skip10], dim=1)
+        h = self.dec3_res1(h, t_emb)
+        h = torch.cat([h, skip9],  dim=1)
+        h = self.dec3_res2(h, t_emb)
+        h = self.dec3_up(h)                # (B, 256,  8,  8)
+
+        # ── Decoder — Level 2  (8×8) ─────────────────────────────────────────
+        h = torch.cat([h, skip8], dim=1)
+        h = self.dec2_res0(h, t_emb)
+        h = torch.cat([h, skip7], dim=1)
+        h = self.dec2_res1(h, t_emb)
+        h = torch.cat([h, skip6], dim=1)
+        h = self.dec2_res2(h, t_emb)
+        h = self.dec2_up(h)                # (B, 256, 16, 16)
+
+        # ── Decoder — Level 1  (16×16, attention) ────────────────────────────
+        h = torch.cat([h, skip5], dim=1)
+        h = self.dec1_res0(h, t_emb)
+        h = self.dec1_attn0(h)
+        h = torch.cat([h, skip4], dim=1)
+        h = self.dec1_res1(h, t_emb)
+        h = self.dec1_attn1(h)
+        h = torch.cat([h, skip3], dim=1)   # (B, 384, 16, 16)  ← 256+128
+        h = self.dec1_res2(h, t_emb)
+        h = self.dec1_attn2(h)
+        h = self.dec1_up(h)                # (B, 256, 32, 32)
+
+        # ── Decoder — Level 0  (32×32) ───────────────────────────────────────
+        h = torch.cat([h, skip2], dim=1)   # (B, 384, 32, 32)  ← 256+128
+        h = self.dec0_res0(h, t_emb)
+        h = torch.cat([h, skip1], dim=1)
+        h = self.dec0_res1(h, t_emb)
+        h = torch.cat([h, skip0], dim=1)
+        h = self.dec0_res2(h, t_emb)
+
+        # ── Output ───────────────────────────────────────────────────────────
+        return self.conv_out(F.silu(self.norm_out(h)))   # (B, 3, 32, 32)
