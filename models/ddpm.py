@@ -353,3 +353,198 @@ class UNet(nn.Module):
 
         # ── Output ───────────────────────────────────────────────────────────
         return self.conv_out(F.silu(self.norm_out(h)))   # (B, 3, 32, 32)
+
+
+class NoiseScheduler:
+    """
+    Precomputes all quantities needed for DDPM training (Algorithm 1)
+    and sampling (Algorithm 2).
+
+    All tensors are plain attributes (not nn.Parameters) since the forward
+    process variances βt are fixed constants — Section 3.1: "we ignore the
+    fact that the forward process variances βt are learnable by
+    reparameterization and instead fix them to constants".
+    """
+
+    def __init__(
+        self,
+        T: int = 1000,              # Section 4
+        beta_start: float = 1e-4,   # Section 4: β₁ = 10⁻⁴
+        beta_end:   float = 0.02,   # Section 4: β_T = 0.02
+    ):
+        self.T = T
+
+        # Linear variance schedule — Section 4
+        betas      = torch.linspace(beta_start, beta_end, T)      # βt
+        alphas     = 1.0 - betas                                  # αt = 1 − βt
+        alpha_bars = torch.cumprod(alphas, dim=0)                 # ᾱt = ∏αs  [Eq. 4]
+
+        # Precomputed for forward process q(x_t | x_0) — Eq. 4
+        sqrt_ab   = torch.sqrt(alpha_bars)                        # √ᾱt
+        sqrt_1mab = torch.sqrt(1.0 - alpha_bars)                  # √(1-ᾱt)
+
+        # Precomputed for reverse mean μ_θ — Eq. 11
+        sqrt_recip_a       = torch.sqrt(1.0 / alphas)             # 1/√αt
+        beta_div_sqrt_1mab = betas / sqrt_1mab                    # βt/√(1-ᾱt)
+
+        # Reverse noise scale — Section 3.2:
+        # "both σ²t = βt and σ²t = β̃t had similar results … the first choice
+        #  is optimal for x_0 ~ N(0,I)". We use σ_t = √βt.
+        sigmas = torch.sqrt(betas)
+
+        self.betas              = betas
+        self.alphas             = alphas
+        self.alpha_bars         = alpha_bars
+        self.sqrt_ab            = sqrt_ab
+        self.sqrt_1mab          = sqrt_1mab
+        self.sqrt_recip_a       = sqrt_recip_a
+        self.beta_div_sqrt_1mab = beta_div_sqrt_1mab
+        self.sigmas             = sigmas
+
+    def to(self, device):
+        for attr in [
+            "betas", "alphas", "alpha_bars",
+            "sqrt_ab", "sqrt_1mab",
+            "sqrt_recip_a", "beta_div_sqrt_1mab", "sigmas",
+        ]:
+            setattr(self, attr, getattr(self, attr).to(device))
+        return self
+
+    def q_sample(
+        self,
+        x0:  torch.Tensor,
+        t:   torch.Tensor,
+        eps: torch.Tensor = None,
+    ) -> tuple:
+        """
+        Sample x_t from x_0 in closed form — Section 2, Eq. 4:
+
+            q(x_t | x_0) = N(x_t; √ᾱ_t x_0, (1-ᾱ_t) I)
+
+        Reparameterized as:
+            x_t = √ᾱ_t · x_0 + √(1-ᾱ_t) · ε,   ε ~ N(0, I)
+
+        Used in Algorithm 1 (Training), lines 4-5.
+
+        Returns:
+            x_t  : noisy image at timestep t
+            eps  : the noise that was added (the regression target)
+        """
+        if eps is None:
+            eps = torch.randn_like(x0)
+
+        sqrt_ab   = self.sqrt_ab[t].view(-1, 1, 1, 1)
+        sqrt_1mab = self.sqrt_1mab[t].view(-1, 1, 1, 1)
+
+        x_t = sqrt_ab * x0 + sqrt_1mab * eps
+        return x_t, eps
+
+    def compute_loss(
+        self,
+        model: nn.Module,
+        x0:   torch.Tensor,
+        t:    torch.Tensor,
+    ) -> torch.Tensor:
+        """
+        Simplified training objective — Algorithm 1 / Eq. 14:
+
+            L_simple(θ) = E_{t, x_0, ε} [ || ε − ε_θ(√ᾱ_t x_0 + √(1-ᾱ_t)ε, t) ||² ]
+
+        Section 3.4:
+            "we found it beneficial to sample quality (and simpler to implement)
+             to train on the following variant of the variational bound" [Eq. 14].
+
+        Note: no time-dependent weighting — each timestep contributes equally.
+        The paper shows this reweighting leads to better sample quality (Table 2).
+        """
+        eps               = torch.randn_like(x0)
+        x_t, eps_target   = self.q_sample(x0, t, eps)
+        eps_pred          = model(x_t, t)
+        return F.mse_loss(eps_pred, eps_target)
+
+    @torch.no_grad()
+    def p_sample_step(
+        self,
+        model: nn.Module,
+        x_t:  torch.Tensor,
+        t_idx: int,
+    ) -> torch.Tensor:
+        """
+        One reverse-process step — Algorithm 2:
+
+            z ~ N(0, I)  if t > 1,  else z = 0              [line 3]
+            x_{t-1} = (1/√αt)(x_t − βt/√(1-ᾱt) · ε_θ(x_t,t)) + σt·z  [line 4]
+
+        The reverse mean μ_θ is from Eq. 11 (ε-prediction parameterization).
+        σ_t = √βt (Section 3.2, first choice).
+
+        Args:
+            model : UNet  (ε_θ)
+            x_t   : (B, C, H, W) noisy image at step t_idx
+            t_idx : int, 0-indexed timestep (0 = last denoising step)
+        Returns:
+            x_{t-1} : (B, C, H, W)
+        """
+        B        = x_t.shape[0]
+        t_tensor = torch.full((B,), t_idx, device=x_t.device, dtype=torch.long)
+
+        eps_pred = model(x_t, t_tensor)
+
+        c1   = self.sqrt_recip_a[t_idx]
+        c2   = self.beta_div_sqrt_1mab[t_idx]
+        mean = c1 * (x_t - c2 * eps_pred)
+
+        # Algorithm 2, line 3: z = 0 at the final step (t_idx == 0)
+        if t_idx == 0:
+            return mean
+
+        z     = torch.randn_like(x_t)
+        sigma = self.sigmas[t_idx]
+        return mean + sigma * z
+
+    @torch.no_grad()
+    def p_sample_loop(
+        self,
+        model:  nn.Module,
+        shape:  tuple,
+        device: torch.device,
+        verbose: bool = False,
+    ) -> torch.Tensor:
+        """
+        Full reverse process — Algorithm 2:
+
+            1. x_T ~ N(0, I)
+            2. for t = T, ..., 1 do
+            3.   z ~ N(0, I) if t > 1, else z = 0
+            4.   x_{t-1} = (1/√αt)(x_t − βt/√(1-ᾱt)·ε_θ(x_t,t)) + σt·z
+            5. end for
+            6. return x_0
+
+        Section 3.3:
+            "At the end of sampling, we display μ_θ(x_1, 1) noiselessly."
+            (handled by setting z = 0 when t_idx = 0)
+
+        Args:
+            model  : UNet (ε_θ)
+            shape  : (B, C, H, W)
+            device : torch device
+        Returns:
+            x_0 : (B, C, H, W) generated images in [-1, 1]
+        """
+        was_training = model.training
+        model.eval()
+
+        x = torch.randn(shape, device=device)
+
+        for t in reversed(range(self.T)):
+            if verbose and t % 100 == 0:
+                print(f"  Sampling step {self.T - t}/{self.T}", end="\r")
+            x = self.p_sample_step(model, x, t)
+
+        if verbose:
+            print()
+
+        if was_training:
+            model.train()
+
+        return x
