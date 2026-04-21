@@ -548,3 +548,53 @@ class NoiseScheduler:
             model.train()
 
         return x
+
+class DDPM(nn.Module):
+    """
+    Full DDPM model: UNet + NoiseScheduler.
+
+    Training objective: L_simple = E[||ε − ε_θ(√ᾱt·x_0 + √(1-ᾱt)·ε, t)||²]
+                                                                        [Eq. 14]
+    Sampling: Algorithm 2 (iterative denoising over T steps).
+    """
+
+    def __init__(self, unet: UNet, scheduler: NoiseScheduler):
+        super().__init__()
+        self.unet      = unet
+        self.scheduler = scheduler
+
+    def forward(self, x0: torch.Tensor, t: torch.Tensor) -> torch.Tensor:
+        """
+        Compute L_simple for a batch.
+
+        Algorithm 1:
+          - x_0 already provided
+          - t already sampled by the training loop
+          - ε is sampled inside compute_loss
+
+        Returns:
+            scalar loss tensor
+        """
+        return self.scheduler.compute_loss(self.unet, x0, t)
+
+    @torch.no_grad()
+    def sample(
+        self,
+        n:         int,
+        img_shape: tuple,
+        device:    torch.device,
+        verbose:   bool = False,
+    ) -> torch.Tensor:
+        """
+        Generate n images via Algorithm 2.
+
+        Args:
+            n         : number of images to generate
+            img_shape : (C, H, W) — channel-first
+            device    : torch device
+        Returns:
+            (n, C, H, W) tensor in [-1, 1]; clip and rescale for display
+        """
+        return self.scheduler.p_sample_loop(
+            self.unet, (n, *img_shape), device, verbose=verbose
+        )
