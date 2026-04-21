@@ -113,3 +113,43 @@ class ResidualBlock(nn.Module):
         h = self.conv2(h)
 
         return h + self.skip_conv(x)
+    
+
+class AttentionBlock(nn.Module):
+    """
+    Single-head self-attention with group normalization.
+
+    Appendix B:
+        "We use self-attention at the 16×16 feature map resolution between
+         the convolutional blocks."
+    """
+
+    def __init__(self, channels: int, num_groups: int = 32):
+        super().__init__()
+        self.norm   = nn.GroupNorm(num_groups, channels)
+        self.to_qkv = nn.Conv2d(channels, channels * 3, kernel_size=1)
+        self.proj   = nn.Conv2d(channels, channels, kernel_size=1)
+        self.scale  = channels ** -0.5      # 1/sqrt(d) — prevents softmax saturation
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Args:
+            x : (B, C, H, W)
+        Returns:
+            (B, C, H, W) — same shape, with residual connection
+        """
+        B, C, H, W = x.shape
+
+        h   = self.norm(x)
+        qkv = self.to_qkv(h).view(B, 3, C, H * W)
+        q   = qkv[:, 0]                             # (B, C, H*W)
+        k   = qkv[:, 1]
+        v   = qkv[:, 2]
+
+        scores = torch.bmm(q.permute(0, 2, 1), k) * self.scale  # (B, H*W, H*W)
+        attn   = torch.softmax(scores, dim=-1)
+
+        out = torch.bmm(v, attn.permute(0, 2, 1)).view(B, C, H, W)
+        out = self.proj(out)
+
+        return x + out
