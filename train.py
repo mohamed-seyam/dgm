@@ -10,6 +10,7 @@ import argparse
 import torch
 import torch.optim as optim
 from torchvision.utils import save_image
+from tqdm import tqdm
 
 from models import DDPM, UNet, NoiseScheduler
 from dataset import get_cifar10_loaders
@@ -149,7 +150,9 @@ def train_ddpm():
         unet.train()
         total_loss = 0.0
 
-        for x, _ in train_loader:
+        # Progress bar for batches
+        pbar = tqdm(train_loader, desc=f"Epoch {epoch:4d}/{cfg['epochs']}", ncols=100)
+        for x, _ in pbar:
             x = x.to(DEVICE)                           # x_0 ~ q(x_0)
 
             # t ~ Uniform({0, ..., T-1})
@@ -166,6 +169,9 @@ def train_ddpm():
             optimizer.step()
 
             total_loss += loss.item()
+
+            # Update progress bar with current loss
+            pbar.set_postfix({"loss": f"{loss.item():.5f}"})
 
         avg_loss = total_loss / len(train_loader)
         print(f"Epoch {epoch:4d}/{cfg['epochs']} | Loss: {avg_loss:.5f}")
@@ -196,8 +202,6 @@ def train_ddpm():
         # ── Generate samples ─────────────────────────────────────────────
         # Algorithm 2: x_T ~ N(0,I), iteratively denoise to x_0
         if epoch % cfg["sample_every"] == 0 or epoch == 1:
-            print(f"           Generating {cfg['n_samples']} samples "
-                  f"(Algorithm 2)...")
             samples = model.sample(
                 n=cfg["n_samples"],
                 img_shape=cfg["img_shape"],
@@ -210,9 +214,9 @@ def train_ddpm():
             save_image(
                 samples,
                 os.path.join(out_dir, f"samples_epoch_{epoch:04d}.png"),
-                nrow=8,
+                nrow=4,
             )
-            print(f"           Saved → samples_epoch_{epoch:04d}.png")
+            print(f"Saved samples → samples_epoch_{epoch:04d}.png")
 
     print(f"\nDone. Best loss: {best_loss:.5f}")
     print(f"Outputs saved to: {out_dir}/")

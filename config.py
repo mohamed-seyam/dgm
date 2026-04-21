@@ -32,8 +32,12 @@ import torch
 DDPM_CONFIG = {
     # ── Architecture (Appendix B) ──────────────────────────────────────────
     "img_channels":    3,             # RGB
+    "img_size":        32,            # CIFAR-10: 32×32
     "img_shape":       (3, 32, 32),
-    "base_channels":   64,            # reduced from 128 — ~4x fewer params, CPU-feasible
+    "base_channels":   128,           # Appendix B: original paper value
+    "channel_mult":    (1, 2, 2, 2),  # four resolutions: 32→16→8→4
+    "num_res_blocks":  2,             # two residual blocks per resolution level
+    "attn_resolutions": (16,),        # self-attention at 16×16 only
     "dropout":         0.1,           # Section 4: dropout rate on CIFAR-10
 
     # ── Noise schedule (Section 4) ─────────────────────────────────────────
@@ -43,11 +47,11 @@ DDPM_CONFIG = {
 
     # ── Optimization (Appendix B) ──────────────────────────────────────────
     "lr":              2e-4,          # learning rate 2×10⁻⁴
-    "batch_size":      32,            # reduced from 128 — fits CPU RAM budget
-    "epochs":          100,           # reduced from 500 — still takes days on CPU
+    "batch_size":      128,           # Appendix B: original paper value
+    "epochs":          500,           # Appendix B: original paper value
     # ── Sampling ───────────────────────────────────────────────────────────
     "sample_every":    10,            # generate samples every N epochs
-    "n_samples":       16,            # reduced from 64 — saves disk space
+    "n_samples":       16,            # Appendix B: original paper value 64 but we make 16 for speed
 }
 
 # ---------------------------------------------------------------------------

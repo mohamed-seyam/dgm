@@ -2,6 +2,7 @@ import math
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from tqdm import tqdm
 
 
 class SinusoidalTimeEmbedding(nn.Module):
@@ -536,13 +537,13 @@ class NoiseScheduler:
 
         x = torch.randn(shape, device=device)
 
-        for t in reversed(range(self.T)):
-            if verbose and t % 100 == 0:
-                print(f"  Sampling step {self.T - t}/{self.T}", end="\r")
-            x = self.p_sample_step(model, x, t)
-
+        # Use tqdm progress bar for sampling
+        timesteps = list(reversed(range(self.T)))
         if verbose:
-            print()
+            timesteps = tqdm(timesteps, desc="Sampling", ncols=100)
+
+        for t in timesteps:
+            x = self.p_sample_step(model, x, t)
 
         if was_training:
             model.train()
