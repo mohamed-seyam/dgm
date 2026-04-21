@@ -6,6 +6,22 @@ Change hyperparameters here — nowhere else.
 import torch
 
 # ---------------------------------------------------------------------------
+# VAE — MNIST 28×28 grayscale (Kingma & Welling, 2013 — Appendix C.1)
+# ---------------------------------------------------------------------------
+VAE_CONFIG = {
+    "input_dim":       28 * 28,   # MNIST: 784 pixels
+    "hidden_dim":      400,        # paper uses 200; 400 gives richer features
+    "latent_dim":      20,         # paper Appendix C.1: L=20
+    "recon_loss_type": "bce",      # Bernoulli pixels → BCE (Appendix C.1)
+    "lr":              1e-3,
+    "batch_size":      128,
+    "epochs":          50,
+    "img_shape":       (1, 28, 28),
+    "sample_every":    5,
+    "n_samples":       16,
+}
+
+# ---------------------------------------------------------------------------
 # DDPM — CIFAR-10 32×32 RGB
 #
 # All hyperparameters are taken directly from the paper:

@@ -2,12 +2,31 @@
 Dataset loaders for all experiments.
 
 Datasets:
+    - MNIST      (VAE paper Appendix C.1)  — 28×28 grayscale → BCE loss
     - CIFAR-10   (DDPM paper Appendix B)   — 32×32 RGB → MSE loss + DDPM
 
 """
 
 from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
+
+
+def get_mnist_loaders(data_dir: str, batch_size: int):
+    """
+    MNIST: 60,000 train / 10,000 test, 28×28 grayscale, pixel values in [0, 1].
+    ToTensor() handles [0, 255] uint8 → [0.0, 1.0] float32.
+    """
+    transform = transforms.ToTensor()
+    train_loader = DataLoader(
+        datasets.MNIST(data_dir, train=True,  transform=transform, download=True),
+        batch_size=batch_size, shuffle=True,  num_workers=2,
+    )
+    test_loader = DataLoader(
+        datasets.MNIST(data_dir, train=False, transform=transform, download=True),
+        batch_size=batch_size, shuffle=False, num_workers=2,
+    )
+    print(f"MNIST: 60,000 train / 10,000 test  (28×28 grayscale, [0, 1])")
+    return train_loader, test_loader
 
 
 def get_cifar10_loaders(data_dir: str, batch_size: int):
