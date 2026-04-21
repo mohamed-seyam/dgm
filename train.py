@@ -13,9 +13,9 @@ import torch.optim as optim
 from torchvision.utils import save_image
 from tqdm import tqdm
 
-from models import VAE, DDPM, UNet, NoiseScheduler
+from models import VAE, ConvVAE, DDPM, UNet, NoiseScheduler
 from dataset import get_mnist_loaders, get_cifar10_loaders
-from config import VAE_CONFIG, DDPM_CONFIG, DEVICE, DATA_DIR, OUTPUT_DIR
+from config import VAE_CONFIG, CONV_VAE_CONFIG, DDPM_CONFIG, DEVICE, DATA_DIR, OUTPUT_DIR
 
 
 # ---------------------------------------------------------------------------
@@ -272,12 +272,109 @@ def train_ddpm():
 
 
 # ---------------------------------------------------------------------------
+# ConvVAE training — CIFAR-10 (fair comparison with DDPM)
+# ---------------------------------------------------------------------------
+
+def train_conv_vae():
+    cfg     = CONV_VAE_CONFIG
+    out_dir = os.path.join(OUTPUT_DIR, "conv_vae_cifar10")
+    os.makedirs(out_dir, exist_ok=True)
+
+    print(f"Device     : {DEVICE}")
+    print(f"Dataset    : CIFAR-10  (32×32 RGB)")
+    print(f"latent_dim : {cfg['latent_dim']}")
+    print(f"lr         : {cfg['lr']}")
+    print(f"batch_size : {cfg['batch_size']}\n")
+
+    train_loader, test_loader = get_cifar10_loaders(DATA_DIR, cfg["batch_size"])
+
+    model = ConvVAE(
+        latent_dim=cfg["latent_dim"],
+        hidden_dim=cfg["hidden_dim"],
+    ).to(DEVICE)
+
+    n_params = sum(p.numel() for p in model.parameters())
+    print(f"ConvVAE params : {n_params / 1e6:.2f}M\n")
+
+    optimizer = optim.Adam(model.parameters(), lr=cfg["lr"])
+    best_loss = float("inf")
+
+    for epoch in range(1, cfg["epochs"] + 1):
+        # ── Train ────────────────────────────────────────────────────────
+        model.train()
+        total_loss = total_recon = total_kl = 0.0
+
+        pbar = tqdm(train_loader, desc=f"Epoch {epoch:3d}/{cfg['epochs']}", ncols=100)
+        for x, _ in pbar:
+            x = x.to(DEVICE)
+            x_recon, mu, log_var = model(x)
+            losses = model.loss(x_recon, x, mu, log_var)
+
+            optimizer.zero_grad()
+            losses["loss"].backward()
+            optimizer.step()
+
+            total_loss  += losses["loss"].item()
+            total_recon += losses["recon_loss"].item()
+            total_kl    += losses["kl_loss"].item()
+            pbar.set_postfix({"loss": f"{losses['loss'].item():.2f}"})
+
+        n = len(train_loader)
+        print(f"Epoch {epoch:3d}/{cfg['epochs']} | "
+              f"Loss: {total_loss/n:.2f} | "
+              f"Recon: {total_recon/n:.2f} | "
+              f"KL: {total_kl/n:.2f}")
+
+        # ── Test + checkpoint ─────────────────────────────────────────────
+        if epoch % cfg["sample_every"] == 0 or epoch == 1:
+            model.eval()
+            test_loss = 0.0
+            with torch.no_grad():
+                for x, _ in test_loader:
+                    x = x.to(DEVICE)
+                    x_recon, mu, log_var = model(x)
+                    test_loss += model.loss(x_recon, x, mu, log_var)["loss"].item()
+            test_loss /= len(test_loader)
+            print(f"           Test Loss: {test_loss:.2f}")
+
+            with torch.no_grad():
+                # Reconstruction grid
+                x_sample, _ = next(iter(test_loader))
+                x_sample = x_sample[:8].to(DEVICE)
+                x_recon, _, _ = model(x_sample)
+                comparison = torch.cat([x_sample, x_recon])
+                # Rescale [-1, 1] → [0, 1] for saving
+                save_image((comparison.clamp(-1, 1) + 1) / 2,
+                           os.path.join(out_dir, f"recon_epoch_{epoch:03d}.png"), nrow=8)
+
+                # Generation grid
+                samples = model.sample(cfg["n_samples"], DEVICE)
+                save_image((samples.clamp(-1, 1) + 1) / 2,
+                           os.path.join(out_dir, f"samples_epoch_{epoch:03d}.png"), nrow=4)
+                print(f"           Saved → samples_epoch_{epoch:03d}.png")
+
+            if test_loss < best_loss:
+                best_loss = test_loss
+                ckpt = {
+                    "epoch":     epoch,
+                    "model":     model.state_dict(),
+                    "optimizer": optimizer.state_dict(),
+                    "loss":      best_loss,
+                }
+                torch.save(ckpt, os.path.join(out_dir, "conv_vae_best.pt"))
+                print(f"           Saved checkpoint → conv_vae_best.pt")
+
+    print(f"\nDone. Best test loss: {best_loss:.2f}")
+    print(f"Outputs saved to: {out_dir}/")
+
+
+# ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
 
 def parse_args():
     parser = argparse.ArgumentParser(description="Train generative models")
-    parser.add_argument("--model",   choices=["vae", "ddpm"], default="ddpm")
+    parser.add_argument("--model",   choices=["vae", "conv_vae", "ddpm"], default="ddpm")
     parser.add_argument("--dataset", choices=["mnist", "cifar10"], default="cifar10")
     return parser.parse_args()
 
@@ -287,6 +384,8 @@ if __name__ == "__main__":
 
     if args.model == "vae":
         train_vae()
+    elif args.model == "conv_vae":
+        train_conv_vae()
     elif args.model == "ddpm":
         train_ddpm()
     else:

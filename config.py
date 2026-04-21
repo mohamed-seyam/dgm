@@ -22,6 +22,20 @@ VAE_CONFIG = {
 }
 
 # ---------------------------------------------------------------------------
+# ConvVAE — CIFAR-10 32×32 RGB (for fair comparison with DDPM)
+# ---------------------------------------------------------------------------
+CONV_VAE_CONFIG = {
+    "latent_dim":  128,
+    "hidden_dim":  256,
+    "img_shape":   (3, 32, 32),
+    "lr":          1e-3,
+    "batch_size":  128,
+    "epochs":      100,
+    "sample_every": 5,
+    "n_samples":   16,
+}
+
+# ---------------------------------------------------------------------------
 # DDPM — CIFAR-10 32×32 RGB
 #
 # All hyperparameters are taken directly from the paper:
