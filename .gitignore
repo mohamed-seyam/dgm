@@ -35,6 +35,15 @@ logs/
 runs/
 wandb/
 
+# LaTeX build artifacts (report in latex/ subdirectory)
+latex/*.aux
+latex/*.fls
+latex/*.fdb_latexmk
+latex/*.synctex.gz
+latex/*.log
+latex/*.out
+latex/*.dvi
+
 # Claude
 .claude/
 
