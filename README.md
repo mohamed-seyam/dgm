@@ -13,7 +13,7 @@ From-scratch implementations of **VAE** and **DDPM**, trained and evaluated on M
 
 ## Quick Results
 
-> For the full quantitative + qualitative analysis, architectural comparison, and conclusions see **[REPORT.md](REPORT.md)**.
+> For the full quantitative + qualitative analysis, architectural comparison, and conclusions see the **[PDF report](latex/report.pdf)** (`latex/report.pdf`). The LaTeX source is at [`latex/report.tex`](latex/report.tex).
 
 ### Quantitative
 
