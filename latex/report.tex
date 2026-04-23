@@ -31,7 +31,6 @@
 % Section formatting
 \titleformat{\section}{\large\bfseries}{}{0em}{}[\titlerule]
 \titleformat{\subsection}{\normalsize\bfseries}{}{0em}{}
-\newcommand{\sectionbreak}{\clearpage}
 
 % -------------------------------------------------------
 
@@ -808,7 +807,7 @@ Diffusion models require significant compute to converge --- the paper trained f
 
 \newpage
 % ============================================================
-\section{Part 3 --- Quantitative Evaluation}
+\section{Part 3 --- Evaluation and Comparison}
 % ============================================================
 
 \subsection{3.1 \; Metrics}
@@ -843,40 +842,6 @@ DDPM (ours, best ckpt ep.\ 274) & CIFAR-10 & 25.75   & $7.63 \pm 0.42$  & 5,000 
 The ConvVAE FID of 160.76 reflects the permanent blurriness of VAE samples --- a direct consequence of the pixel-wise MSE loss. The DDPM gap to paper numbers (FID $25.75$ vs $3.17$) is entirely due to training time: our 480-epoch run versus the paper's ${\sim}800$k gradient steps, evaluated on 5k vs 50k samples. The architecture and implementation are correct --- the score improves monotonically with training.
 
 \subsection{3.3 \; Visual Results}
-
-\subsubsection*{DDPM --- Sample Progression}
-
-As shown in Figure~\ref{fig:ddpm-prog-eval}, DDPM produces sharp, class-diverse images from epoch 60 onwards, with quality continuing to improve through epoch 240.
-
-\begin{figure}[H]
-    \centering
-    \begin{subfigure}[t]{0.18\textwidth}
-        \includegraphics[width=\linewidth]{ddpm_epoch001.png}
-        \caption{Epoch 1}
-    \end{subfigure}
-    \hfill
-    \begin{subfigure}[t]{0.18\textwidth}
-        \includegraphics[width=\linewidth]{ddpm_epoch060.png}
-        \caption{Epoch 60}
-    \end{subfigure}
-    \hfill
-    \begin{subfigure}[t]{0.18\textwidth}
-        \includegraphics[width=\linewidth]{ddpm_epoch240.png}
-        \caption{Epoch 240}
-    \end{subfigure}
-    \hfill
-    \begin{subfigure}[t]{0.18\textwidth}
-        \includegraphics[width=\linewidth]{ddpm_epoch300.png}
-        \caption{Epoch 300}
-    \end{subfigure}
-    \hfill
-    \begin{subfigure}[t]{0.18\textwidth}
-        \includegraphics[width=\linewidth]{ddpm_epoch480.png}
-        \caption{Epoch 480}
-    \end{subfigure}
-    \caption{DDPM generated samples across training. Sharp, class-diverse images emerge by epoch 60; quality peaks at epoch 480. FID $= 25.75$, IS $= 7.63 \pm 0.42$ (best checkpoint, epoch 274).}
-    \label{fig:ddpm-prog-eval}
-\end{figure}
 
 \subsubsection*{ConvVAE --- Sample Progression}
 
@@ -932,11 +897,7 @@ Figure~\ref{fig:comparison} directly compares the best-checkpoint samples from e
     \label{fig:comparison}
 \end{figure}
 
-% ============================================================
-\section{Part 4 --- Qualitative Analysis}
-% ============================================================
-
-\subsection{4.1 \; VAE Analysis}
+\subsection{3.4 \; VAE Analysis}
 
 \textbf{Strengths:}
 \begin{itemize}
@@ -953,7 +914,7 @@ Figure~\ref{fig:comparison} directly compares the best-checkpoint samples from e
 
 \paperref{Paper ref --- Kingma \& Welling (2014), Section 5: The paper itself notes that the samples are blurry on Frey Face, attributed to the Gaussian decoder assumption.}
 
-\subsection{4.2 \; DDPM Analysis}
+\subsection{3.5 \; DDPM Analysis}
 
 \textbf{Strengths:}
 \begin{itemize}
@@ -971,9 +932,7 @@ Figure~\ref{fig:comparison} directly compares the best-checkpoint samples from e
 
 \paperref{Paper ref --- Ho et al.\ Section 5 (Limitations): The paper explicitly notes the slow sampling speed as a limitation compared to single-pass models.}
 
-% ============================================================
-\section{Part 5 --- Key Differences Between VAE and DDPM}
-% ============================================================
+\subsection{3.6 \; Key Differences Between VAE and DDPM}
 
 \begin{table}[H]
 \centering
