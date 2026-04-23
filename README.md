@@ -11,7 +11,7 @@ From-scratch implementations of **VAE** and **DDPM**, trained and evaluated on M
 | Model | Dataset | FID ↓ | IS ↑ | Eval samples | Epochs |
 |-------|---------|------:|-----:|:------------:|:------:|
 | ConvVAE | CIFAR-10 | 160.76 | 3.02 ± 0.08 | 5,000 | 5,000 |
-| DDPM (ours) | CIFAR-10 | **25.75** | **7.63 ± 0.42** | 5,000 | 274 (best ckpt) |
+| DDPM (ours) | CIFAR-10 | **25.75** | **7.63 ± 0.42** | 5,000 | 274 |
 | DDPM (paper) | CIFAR-10 | 3.17 | 9.46 ± 0.11 | 50,000 | 2,050 |
 
 The gap to the paper's FID 3.17 is expected — the paper trains to 2,050 epochs and evaluates on 50 k samples.
@@ -25,7 +25,7 @@ The gap to the paper's FID 3.17 is expected — the paper trains to 2,050 epochs
 | <img src="assets/ddpm_epoch001.png" width="160"/> | <img src="assets/ddpm_epoch060.png" width="160"/> | <img src="assets/ddpm_epoch240.png" width="160"/> | <img src="assets/ddpm_epoch300.png" width="160"/> | <img src="assets/ddpm_epoch480.png" width="160"/> |
 | Pure noise | Recognizable objects | Near photo-realistic | Sharp & diverse | Best quality |
 
-DDPM produces recognizable CIFAR-10 images by epoch 60, near photo-realistic samples by epoch 240, and its sharpest results at epoch 480. Best checkpoint (epoch 274) scores FID 25.75 / IS 7.63 ± 0.42.
+DDPM produces recognizable CIFAR-10 images by epoch 60, near photo-realistic samples by epoch 240, and its sharpest results at epoch 480. Checkpoint 274 scores FID 25.75 / IS 7.63 ± 0.42.
 
 ---
 

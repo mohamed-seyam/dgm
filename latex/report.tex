@@ -767,7 +767,7 @@ Epochs              & 500 (paper: ${\sim}800$k steps $\approx 2050$ epochs) & --
 
 \subsection{2.7 \; Results}
 
-Diffusion models require significant compute to converge --- the paper trained for approximately 800k gradient steps on a GPU cluster. Our run reached 480 epochs with the best checkpoint at epoch 274, achieving FID $= 25.75$ and IS $= 7.63 \pm 0.42$. The model produces sharp, class-diverse images well before convergence; quality continues to improve steadily through epoch 480. The sample progression is shown in Figure~\ref{fig:ddpm-prog}.
+Diffusion models require significant compute to converge --- the paper trained for approximately 800k gradient steps on a GPU cluster. Our run reached 480 epochs; checkpoint 274 achieved FID $= 25.75$ and IS $= 7.63 \pm 0.42$. The model produces sharp, class-diverse images well before convergence; quality continues to improve steadily through epoch 480. The sample progression is shown in Figure~\ref{fig:ddpm-prog}.
 
 \begin{figure}[H]
     \centering
@@ -795,7 +795,7 @@ Diffusion models require significant compute to converge --- the paper trained f
         \includegraphics[width=\linewidth]{ddpm_epoch480.png}
         \caption{Epoch 480\\best quality}
     \end{subfigure}
-    \caption{DDPM sample progression on CIFAR-10. Recognisable objects emerge by epoch 60; near photo-realistic samples by epoch 240; best visual quality at epoch 480. Best checkpoint (epoch 274) scores FID $= 25.75$, IS $= 7.63 \pm 0.42$.}
+    \caption{DDPM sample progression on CIFAR-10. Recognisable objects emerge by epoch 60; near photo-realistic samples by epoch 240; best visual quality at epoch 480. Checkpoint 274 scores FID $= 25.75$, IS $= 7.63 \pm 0.42$.}
     \label{fig:ddpm-prog}
 \end{figure}
 
@@ -828,7 +828,7 @@ IS measures two properties jointly: each generated image should clearly resemble
 \midrule
 VAE-Conv                    & CIFAR-10 & 160.76      & $3.02 \pm 0.08$  & 5,000  & 5,000 \\
 DDPM (paper, full training) & CIFAR-10 & 3.17        & $9.46 \pm 0.11$  & 50,000 & 2,050 \\
-DDPM (ours, best ckpt ep.\ 274) & CIFAR-10 & 25.75   & $7.63 \pm 0.42$  & 5,000  & 480   \\
+DDPM (ours, ep.\ 274) & CIFAR-10 & 25.75   & $7.63 \pm 0.42$  & 5,000  & 480   \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -992,7 +992,7 @@ Both models were implemented from scratch following the original papers, trained
 
 The \textbf{ConvVAE} achieved FID $= 160.76$ and IS $= 3.02 \pm 0.08$ after 5,000 epochs on CIFAR-10. Visual inspection (Figures~\ref{fig:convvae-prog} and~\ref{fig:convvae-recon}) confirms the expected behavior: samples are permanently blurry and class-unidentifiable regardless of training length. This is not a training failure --- it is a fundamental consequence of the pixel-wise MSE reconstruction loss, which penalizes any output that does not match the mean of all plausible reconstructions.
 
-The \textbf{DDPM} showed a dramatically different trajectory. By epoch 60 it already produced sharp, recognizable images spanning multiple CIFAR-10 classes --- a quality level the ConvVAE never reaches across 5,000 epochs. Quality continued to improve through epochs 300 and 480, as seen in Figure~\ref{fig:ddpm-prog}. The best checkpoint at epoch 274 achieved FID $= 25.75$ and IS $= 7.63 \pm 0.42$ (evaluated on 5,000 samples). The gap to the paper's FID $= 3.17$ is expected --- the paper trains to 2,050 epochs and evaluates on 50,000 samples.
+The \textbf{DDPM} showed a dramatically different trajectory. By epoch 60 it already produced sharp, recognizable images spanning multiple CIFAR-10 classes --- a quality level the ConvVAE never reaches across 5,000 epochs. Quality continued to improve through epochs 300 and 480, as seen in Figure~\ref{fig:ddpm-prog}. Checkpoint 274 achieved FID $= 25.75$ and IS $= 7.63 \pm 0.42$ (evaluated on 5,000 samples). The gap to the paper's FID $= 3.17$ is expected --- the paper trains to 2,050 epochs and evaluates on 50,000 samples.
 
 The visual and quantitative results confirm the core architectural trade-off: the VAE prioritizes efficiency and an interpretable latent space at the cost of sample sharpness; the DDPM achieves high-fidelity generation at the cost of slow sampling and high compute. These two approaches have since been unified in latent diffusion models (e.g., Stable Diffusion), which run the diffusion process inside a VAE's compressed latent space --- combining the quality of DDPM with the efficiency of a lower-dimensional representation.
 
