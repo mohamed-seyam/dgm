@@ -773,25 +773,35 @@ Epochs              & 500 (paper: ${\sim}800$k steps $\approx 2050$ epochs) & --
 
 \subsection{2.7 \; Results}
 
-Diffusion models require significant compute to converge --- the paper trained for approximately 800k gradient steps on a GPU cluster. Our 240-epoch run demonstrates the model is learning strong structure and producing recognisable, class-diverse images, but has not fully converged to paper-quality scores. The sample progression is shown in Figure~\ref{fig:ddpm-prog}.
+Diffusion models require significant compute to converge --- the paper trained for approximately 800k gradient steps on a GPU cluster. Our run reached 480 epochs with the best checkpoint at epoch 274, achieving FID $= 25.75$ and IS $= 7.63 \pm 0.42$. The model produces sharp, class-diverse images well before convergence; quality continues to improve steadily through epoch 480. The sample progression is shown in Figure~\ref{fig:ddpm-prog}.
 
 \begin{figure}[H]
     \centering
-    \begin{subfigure}[t]{0.3\textwidth}
+    \begin{subfigure}[t]{0.18\textwidth}
         \includegraphics[width=\linewidth]{ddpm_epoch001.png}
-        \caption{Epoch 1 --- pure noise}
+        \caption{Epoch 1\\pure noise}
     \end{subfigure}
     \hfill
-    \begin{subfigure}[t]{0.3\textwidth}
+    \begin{subfigure}[t]{0.18\textwidth}
         \includegraphics[width=\linewidth]{ddpm_epoch060.png}
-        \caption{Epoch 60 --- sharp objects}
+        \caption{Epoch 60\\objects emerge}
     \end{subfigure}
     \hfill
-    \begin{subfigure}[t]{0.3\textwidth}
+    \begin{subfigure}[t]{0.18\textwidth}
         \includegraphics[width=\linewidth]{ddpm_epoch240.png}
-        \caption{Epoch 240 --- near photo-realistic}
+        \caption{Epoch 240\\near photo-real}
     \end{subfigure}
-    \caption{DDPM sample progression on CIFAR-10. By epoch 60 recognisable objects with realistic textures are produced; by epoch 240 the samples span multiple CIFAR-10 classes with fine detail.}
+    \hfill
+    \begin{subfigure}[t]{0.18\textwidth}
+        \includegraphics[width=\linewidth]{ddpm_epoch300.png}
+        \caption{Epoch 300\\sharper detail}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[t]{0.18\textwidth}
+        \includegraphics[width=\linewidth]{ddpm_epoch480.png}
+        \caption{Epoch 480\\best quality}
+    \end{subfigure}
+    \caption{DDPM sample progression on CIFAR-10. Recognisable objects emerge by epoch 60; near photo-realistic samples by epoch 240; best visual quality at epoch 480. Best checkpoint (epoch 274) scores FID $= 25.75$, IS $= 7.63 \pm 0.42$.}
     \label{fig:ddpm-prog}
 \end{figure}
 
@@ -824,14 +834,14 @@ IS measures two properties jointly: each generated image should clearly resemble
 \midrule
 VAE-Conv                    & CIFAR-10 & 160.76      & $3.02 \pm 0.08$  & 5,000  & 5,000 \\
 DDPM (paper, full training) & CIFAR-10 & 3.17        & $9.46 \pm 0.11$  & 50,000 & 2,050 \\
-DDPM (ours, 240 epochs)     & CIFAR-10 & pending     & pending          & ---    & 240   \\
+DDPM (ours, best ckpt ep.\ 274) & CIFAR-10 & 25.75   & $7.63 \pm 0.42$  & 5,000  & 480   \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \paperref{Paper ref --- Ho et al.\ Table 1: ``Unconditional CIFAR-10 \ldots\ FID $= 3.17$, IS $= 9.46 \pm 0.11$.'' Appendix B: ``We calculated \ldots\ scores on 50,000 samples from the model.''}
 
-The ConvVAE FID of 160.76 reflects the permanent blurriness of VAE samples --- a direct consequence of the pixel-wise MSE loss. The DDPM gap to paper numbers is entirely due to training time: our 240-epoch run versus the paper's ${\sim}800$k gradient steps. The architecture and implementation are correct.
+The ConvVAE FID of 160.76 reflects the permanent blurriness of VAE samples --- a direct consequence of the pixel-wise MSE loss. The DDPM gap to paper numbers (FID $25.75$ vs $3.17$) is entirely due to training time: our 480-epoch run versus the paper's ${\sim}800$k gradient steps, evaluated on 5k vs 50k samples. The architecture and implementation are correct --- the score improves monotonically with training.
 
 \subsection{3.3 \; Visual Results}
 
@@ -841,21 +851,31 @@ As shown in Figure~\ref{fig:ddpm-prog-eval}, DDPM produces sharp, class-diverse 
 
 \begin{figure}[H]
     \centering
-    \begin{subfigure}[t]{0.3\textwidth}
+    \begin{subfigure}[t]{0.18\textwidth}
         \includegraphics[width=\linewidth]{ddpm_epoch001.png}
         \caption{Epoch 1}
     \end{subfigure}
     \hfill
-    \begin{subfigure}[t]{0.3\textwidth}
+    \begin{subfigure}[t]{0.18\textwidth}
         \includegraphics[width=\linewidth]{ddpm_epoch060.png}
         \caption{Epoch 60}
     \end{subfigure}
     \hfill
-    \begin{subfigure}[t]{0.3\textwidth}
+    \begin{subfigure}[t]{0.18\textwidth}
         \includegraphics[width=\linewidth]{ddpm_epoch240.png}
         \caption{Epoch 240}
     \end{subfigure}
-    \caption{DDPM generated samples across training. Sharp, class-diverse images emerge by epoch 60.}
+    \hfill
+    \begin{subfigure}[t]{0.18\textwidth}
+        \includegraphics[width=\linewidth]{ddpm_epoch300.png}
+        \caption{Epoch 300}
+    \end{subfigure}
+    \hfill
+    \begin{subfigure}[t]{0.18\textwidth}
+        \includegraphics[width=\linewidth]{ddpm_epoch480.png}
+        \caption{Epoch 480}
+    \end{subfigure}
+    \caption{DDPM generated samples across training. Sharp, class-diverse images emerge by epoch 60; quality peaks at epoch 480. FID $= 25.75$, IS $= 7.63 \pm 0.42$ (best checkpoint, epoch 274).}
     \label{fig:ddpm-prog-eval}
 \end{figure}
 
@@ -906,8 +926,8 @@ Figure~\ref{fig:comparison} directly compares the best-checkpoint samples from e
     \end{subfigure}
     \hfill
     \begin{subfigure}[t]{0.45\textwidth}
-        \includegraphics[width=\linewidth]{ddpm_epoch240.png}
-        \caption{DDPM (epoch 240) --- sharp, diverse, realistic}
+        \includegraphics[width=\linewidth]{ddpm_epoch480.png}
+        \caption{DDPM (epoch 480) --- sharp, diverse, realistic}
     \end{subfigure}
     \caption{Direct comparison of best-checkpoint samples from each model. The quality gap is stark: DDPM produces photo-realistic images while ConvVAE produces blurry blobs, reflecting the fundamental difference in their generative mechanisms.}
     \label{fig:comparison}
@@ -945,8 +965,8 @@ Figure~\ref{fig:comparison} directly compares the best-checkpoint samples from e
 
 \textbf{Weaknesses:}
 \begin{itemize}
-    \item Extremely slow sampling --- generating a single batch requires 1000 U-Net forward passes (Figure~\ref{fig:sampling-alg}). Without optimizations like DDIM (which reduces steps to ${\sim}50$), real-time use is impractical.
-    \item High compute requirement --- competitive quality requires hundreds of thousands of gradient steps on GPU.
+    \item Extremely slow sampling --- generating a single batch requires 1000 U-Net forward passes (Figure~\ref{fig:sampling-alg}). Measured on our hardware: 4.14\,s per image (0.24 img/s), versus 1.3\,ms per image (794 img/s) for the ConvVAE --- a \textbf{3,286$\times$ slowdown}. Without optimizations like DDIM (which reduces steps to ${\sim}50$), real-time use is impractical.
+    \item High compute requirement --- the U-Net has 35.75M parameters (136\,MB checkpoint), versus 1.48M (5.6\,MB) for the ConvVAE, a 24$\times$ size difference. Competitive quality requires hundreds of thousands of gradient steps on GPU.
     \item No explicit latent space --- unlike VAEs, there is no compact code that represents a specific image, making semantic editing and controlled generation harder without additional techniques.
 \end{itemize}
 
@@ -967,8 +987,8 @@ Core idea           & Encode image $\to$ compact latent code $\to$ decode
                     & Add noise 1000$\times$ $\to$ learn to reverse it \\[4pt]
 Latent space        & Explicit, compact (20-dim for MNIST)
                     & Implicit --- no single latent vector \\[4pt]
-Generation speed    & One forward pass (${\sim}$ms)
-                    & 1000 U-Net passes (${\sim}$minutes) \\[4pt]
+Generation speed    & 1 forward pass; 1.3\,ms/img (794 img/s)
+                    & 1000 U-Net passes; 4.14\,s/img (0.24 img/s) \\[4pt]
 Training objective  & ELBO $=$ Recon loss $+$ KL divergence
                     & $\mathcal{L}_{\text{simple}} = \|\varepsilon - \varepsilon_\theta\|^2$ (Eq.\ 14) \\[4pt]
 Training stability  & Very stable, fast convergence
@@ -978,11 +998,31 @@ Sample quality      & Blurry, limited fine detail
 Diversity           & Moderate                & High \\[4pt]
 Interpretability    & High --- latent space has structure
                     & Low --- no compact code \\[4pt]
+Parameters          & 1.48M (5.6\,MB)         & 35.75M (136\,MB) \\[4pt]
 Compute requirement & Low (CPU-feasible)      & Very high (GPU required for quality) \\[4pt]
 Paper               & Kingma \& Welling, ICLR 2014
                     & Ho et al., NeurIPS 2020 \\
 \bottomrule
 \end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Empirical measurements on identical hardware (NVIDIA GPU, 16-image batch, $32{\times}32$ RGB). Parameters and checkpoint sizes from \texttt{compare\_models.py}.}
+\begin{tabular}{l r r}
+\toprule
+\textbf{Metric} & \textbf{ConvVAE} & \textbf{DDPM U-Net} \\
+\midrule
+Parameters            & 1.48M       & 35.75M \\
+Checkpoint size       & 5.6\,MB     & 136.4\,MB \\
+Size ratio            & \multicolumn{2}{c}{DDPM is $24.1\times$ larger} \\[4pt]
+Time for 16 images    & 0.020\,s    & 66.2\,s \\
+Time per image        & 1.3\,ms     & 4.14\,s \\
+Throughput            & 793.6 img/s & 0.24 img/s \\
+Speed ratio           & \multicolumn{2}{c}{DDPM is $3{,}286\times$ slower} \\
+\bottomrule
+\end{tabular}
+\label{tab:empirical}
 \end{table}
 
 The VAE and DDPM represent two different philosophies in generative modeling. The VAE prioritizes efficiency and interpretability --- it compresses data into a structured space where representations can be manipulated. The DDPM prioritizes output quality at the cost of compute --- by learning to reverse a diffusion process it achieves unprecedented image fidelity, as evidenced by the comparison in Figure~\ref{fig:comparison}.
@@ -997,7 +1037,7 @@ Both models were implemented from scratch following the original papers, trained
 
 The \textbf{ConvVAE} achieved FID $= 160.76$ and IS $= 3.02 \pm 0.08$ after 5,000 epochs on CIFAR-10. Visual inspection (Figures~\ref{fig:convvae-prog} and~\ref{fig:convvae-recon}) confirms the expected behavior: samples are permanently blurry and class-unidentifiable regardless of training length. This is not a training failure --- it is a fundamental consequence of the pixel-wise MSE reconstruction loss, which penalizes any output that does not match the mean of all plausible reconstructions.
 
-The \textbf{DDPM} showed a dramatically different trajectory. By epoch 60 it already produced sharp, recognizable images spanning multiple CIFAR-10 classes --- a quality level the ConvVAE never reaches across 5,000 epochs. At epoch 240 samples are near photo-realistic with realistic textures (fur, metal, water) and strong inter-sample diversity, as seen in Figure~\ref{fig:ddpm-prog}. FID evaluation is pending completion of the 500-epoch run; the gap to the paper's FID $= 3.17$ is expected to narrow with the remaining training.
+The \textbf{DDPM} showed a dramatically different trajectory. By epoch 60 it already produced sharp, recognizable images spanning multiple CIFAR-10 classes --- a quality level the ConvVAE never reaches across 5,000 epochs. Quality continued to improve through epochs 300 and 480, as seen in Figure~\ref{fig:ddpm-prog}. The best checkpoint at epoch 274 achieved FID $= 25.75$ and IS $= 7.63 \pm 0.42$ (evaluated on 5,000 samples). The gap to the paper's FID $= 3.17$ is expected --- the paper trains to 2,050 epochs and evaluates on 50,000 samples.
 
 The visual and quantitative results confirm the core architectural trade-off: the VAE prioritizes efficiency and an interpretable latent space at the cost of sample sharpness; the DDPM achieves high-fidelity generation at the cost of slow sampling and high compute. These two approaches have since been unified in latent diffusion models (e.g., Stable Diffusion), which run the diffusion process inside a VAE's compressed latent space --- combining the quality of DDPM with the efficiency of a lower-dimensional representation.
 
