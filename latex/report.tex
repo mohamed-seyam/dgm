@@ -552,52 +552,48 @@ The residual block is the core building unit of the U-Net. It applies two convol
 \begin{figure}[H]
 \centering
 \begin{tikzpicture}[
-  box/.style  = {draw, rounded corners=3pt, minimum width=2.6cm, minimum height=0.55cm,
-                 align=center, fill=blue!10, font=\small},
-  tbox/.style = {draw, rounded corners=3pt, minimum width=2.2cm, minimum height=0.55cm,
-                 align=center, fill=violet!15, font=\small},
+  box/.style  = {draw, rounded corners=2pt, minimum width=1.3cm, minimum height=0.5cm,
+                 align=center, fill=blue!10, font=\scriptsize},
+  tbox/.style = {draw, rounded corners=2pt, minimum width=1.3cm, minimum height=0.5cm,
+                 align=center, fill=violet!15, font=\scriptsize},
   addcirc/.style = {draw, circle, inner sep=2pt, fill=orange!20, font=\small},
-  arr/.style  = {-{Stealth[length=4pt]}, thick},
-  node distance = 0.55cm,
+  arr/.style  = {-{Stealth[length=3.5pt]}, thick},
 ]
+% ── Main horizontal path ─────────────────────────────────────────────────────
+\node[box]     (x)     {$x$};
+\node[box,     right=0.18cm of x]     (gn1)   {GN\\\tiny\texttt{:74}};
+\node[box,     right=0.18cm of gn1]   (silu1) {SiLU\\\tiny\texttt{:75}};
+\node[box,     right=0.18cm of silu1] (conv1) {Conv\\\tiny\texttt{:76}};
+\node[addcirc, right=0.18cm of conv1] (add1)  {$\oplus$};
+\node[box,     right=0.18cm of add1]  (gn2)   {GN\\\tiny\texttt{:82}};
+\node[box,     right=0.18cm of gn2]   (silu2) {SiLU\\\tiny\texttt{:83}};
+\node[box,     right=0.18cm of silu2] (drop)  {Drop\\\tiny\texttt{:84}};
+\node[box,     right=0.18cm of drop]  (conv2) {Conv\\\tiny\texttt{:85}};
+\node[addcirc, right=0.18cm of conv2] (add2)  {$\oplus$};
+\node[box,     right=0.18cm of add2]  (out)   {out};
 
-% ── Main vertical path ───────────────────────────────────────────────────────
-\node[box]     (x)    {$x$\\\footnotesize input};
-\node[box, below=of x]    (gn1)   {GroupNorm\\\tiny\texttt{:74}};
-\node[box, below=of gn1]  (silu1) {SiLU\\\tiny\texttt{:75}};
-\node[box, below=of silu1](conv1) {Conv $3{\times}3$\\\tiny\texttt{:76}};
-\node[addcirc, below=of conv1]    (add1)  {$\oplus$};
-\node[box, below=of add1] (gn2)   {GroupNorm\\\tiny\texttt{:82}};
-\node[box, below=of gn2]  (silu2) {SiLU\\\tiny\texttt{:83}};
-\node[box, below=of silu2](drop)  {Dropout\\\tiny\texttt{:84}};
-\node[box, below=of drop] (conv2) {Conv $3{\times}3$\\\tiny\texttt{:85}};
-\node[addcirc, below=of conv2]    (add2)  {$\oplus$};
-\node[box, below=of add2] (out)   {output};
-
-% ── Main arrows ──────────────────────────────────────────────────────────────
 \foreach \a/\b in {x/gn1, gn1/silu1, silu1/conv1, conv1/add1,
                    add1/gn2, gn2/silu2, silu2/drop, drop/conv2, conv2/add2, add2/out}
   \draw[arr] (\a) -- (\b);
 
-% ── Time embedding branch ─────────────────────────────────────────────────
-\node[tbox, right=2.0cm of add1] (lin) {Linear\\\tiny\texttt{:80}};
-\node[tbox, above=0.55cm of lin] (tsilu) {SiLU\\\tiny\texttt{:79}};
-\node[tbox, above=0.55cm of tsilu] (et) {$e_t$\\\footnotesize time emb};
+% ── Time embedding branch (above add1) ───────────────────────────────────────
+\node[tbox,              above=1.0cm of add1] (lin)   {Linear\\\tiny\texttt{:80}};
+\node[tbox,              above=0.18cm of lin] (tsilu) {SiLU\\\tiny\texttt{:79}};
+\node[tbox, fill=violet!25, above=0.18cm of tsilu] (et) {$e_t$};
 
-\draw[arr] (et)    -- (tsilu);
-\draw[arr] (tsilu) -- (lin);
-\draw[arr] (lin.west) -- (add1.east);
+\draw[arr] (et.south) -- (tsilu.north);
+\draw[arr] (tsilu.south) -- (lin.north);
+\draw[arr] (lin.south) -- (add1.north);
 
-% ── Skip bypass ──────────────────────────────────────────────────────────────
-\coordinate (sl)     at ($(x.west)+(-0.9,0)$);
-\coordinate (sl_bot) at ($(add2.west)+(-0.9,0)$);
-\draw[-{Stealth[length=4pt]}, thick, dashed, draw=gray!60]
-      (x.west) -- (sl) -- (sl_bot) -- (add2.west);
-\node[font=\footnotesize, text=gray!80, left=0.05cm of sl_bot, yshift=0.2cm]
-      {skip conv};
-
+% ── Skip bypass (below) ───────────────────────────────────────────────────────
+\coordinate (bl) at ($(x.south)+(0,-0.42)$);
+\coordinate (br) at ($(add2.south)+(0,-0.42)$);
+\draw[-{Stealth[length=3.5pt]}, thick, dashed, draw=gray!60]
+    (x.south) -- (bl) -- (br) -- (add2.south);
+\node[font=\tiny, text=gray!70] at ($(bl)!0.5!(br)+(0,-0.2)$)
+    {skip conv\,(\texttt{:88--92})};
 \end{tikzpicture}
-\caption{Residual block data flow (\texttt{models/ddpm.py : ResidualBlock}, line~48). Time embedding $e_t$ is injected via \texttt{time\_act}+\texttt{time\_linear} (lines~79--80) between the two Conv\,$3{\times}3$ layers. Skip $1{\times}1$ conv (lines~88--92) bypasses the block when channel counts differ. Line numbers reference \texttt{ResidualBlock.forward} (line~94).}
+\caption{Residual block data flow (\texttt{models/ddpm.py : ResidualBlock}, line~48). Two Conv\,$3{\times}3$ blocks with GroupNorm and SiLU. Time embedding $e_t$ injected via SiLU+Linear (lines~79--80) at the middle $\oplus$. Skip $1{\times}1$ conv (lines~88--92) when channels differ. Line numbers: \texttt{ResidualBlock.forward} (line~94).}
 \label{fig:res-block}
 \end{figure}
 
@@ -617,68 +613,37 @@ Self-attention is inserted at the $16{\times}16$ resolution only. It lets the ne
 \begin{figure}[H]
 \centering
 \begin{tikzpicture}[
-  box/.style   = {draw, rounded corners=3pt, minimum width=2.6cm, minimum height=0.55cm,
-                  align=center, fill=blue!10, font=\small},
-  qbox/.style  = {draw, rounded corners=3pt, minimum width=1.5cm, minimum height=0.55cm,
-                  align=center, fill=red!12, font=\small},
-  kbox/.style  = {draw, rounded corners=3pt, minimum width=1.5cm, minimum height=0.55cm,
-                  align=center, fill=green!15, font=\small},
-  vbox/.style  = {draw, rounded corners=3pt, minimum width=1.5cm, minimum height=0.55cm,
-                  align=center, fill=orange!18, font=\small},
+  box/.style   = {draw, rounded corners=2pt, minimum width=1.45cm, minimum height=0.5cm,
+                  align=center, fill=blue!10, font=\scriptsize},
   addcirc/.style = {draw, circle, inner sep=2pt, fill=orange!20, font=\small},
-  arr/.style   = {-{Stealth[length=4pt]}, thick},
-  node distance = 0.55cm,
+  arr/.style   = {-{Stealth[length=3.5pt]}, thick},
+  darr/.style  = {-{Stealth[length=3.5pt]}, thick, dashed, draw=gray!60},
 ]
+% ── Main horizontal path ─────────────────────────────────────────────────────
+\node[box]     (x)       {$x$};
+\node[box,     right=0.2cm of x]       (gn)     {GN\\\tiny\texttt{:130}};
+\node[box,     right=0.2cm of gn]      (qkv)    {to\_qkv\\\tiny\texttt{:131}};
+\node[box,     right=0.2cm of qkv]     (scores) {$QK^T\!/\!\sqrt{C}$\\\tiny\texttt{:150}};
+\node[box,     right=0.2cm of scores]  (softmax){Softmax\\\tiny\texttt{:151}};
+\node[box,     right=0.2cm of softmax] (wsum)   {$A{\cdot}V$\\\tiny\texttt{:153}};
+\node[box,     right=0.2cm of wsum]    (proj)   {proj\\\tiny\texttt{:132}};
+\node[addcirc, right=0.2cm of proj]    (add)    {$\oplus$};
+\node[box,     right=0.2cm of add]     (out)    {out};
 
-% ── Top: input → GN → QKV conv ───────────────────────────────────────────────
-\node[box]              (x)    {$x$\\\footnotesize input};
-\node[box, below=of x]  (gn)   {GroupNorm\\\tiny\texttt{:130}};
-\node[box, below=of gn] (qkvc) {Conv $1{\times}1$, $C\!\to\!3C$\\\tiny\texttt{to\_qkv\ :131}};
+\foreach \a/\b in {x/gn, gn/qkv, qkv/scores, scores/softmax, softmax/wsum, wsum/proj, proj/add, add/out}
+  \draw[arr] (\a) -- (\b);
 
-\draw[arr] (x) -- (gn);
-\draw[arr] (gn) -- (qkvc);
+% ── V bypass (arc below: qkv → wsum, skipping scores+softmax) ────────────────
+\draw[darr] (qkv.south) to[out=-80, in=-100, looseness=0.55] (wsum.south);
+\node[font=\tiny, text=gray!70] at ($(qkv.south)!0.5!(wsum.south)+(0,-0.52)$) {$V$};
 
-% ── Fan-out to Q, K, V ───────────────────────────────────────────────────────
-\node[qbox, below=0.7cm of qkvc, xshift=-2.2cm] (Q) {$Q$};
-\node[kbox, below=0.7cm of qkvc]                (K) {$K$};
-\node[vbox, below=0.7cm of qkvc, xshift= 2.2cm] (V) {$V$};
-
-\draw[arr] (qkvc.south) -- ++(0,-0.25) -| (Q.north);
-\draw[arr] (qkvc.south) -- (K.north);
-\draw[arr] (qkvc.south) -- ++(0,-0.25) -| (V.north);
-
-% ── Attention scores ─────────────────────────────────────────────────────────
-\node[box, below=0.8cm of K] (scores) {$Q K^T / \sqrt{C}$\\\tiny\texttt{:150}};
-\node[box, below=of scores]  (softmax){Softmax\\\tiny\texttt{:151}};
-
-\draw[arr] (Q.south) |- (scores.west);
-\draw[arr] (K.south) -- (scores.north);
-
-\draw[arr] (scores) -- (softmax);
-
-% ── Weighted sum ─────────────────────────────────────────────────────────────
-\node[box, below=of softmax] (wsum) {$A \cdot V$\\\footnotesize weighted sum\\\tiny\texttt{:153}};
-\draw[arr] (softmax) -- (wsum);
-\draw[arr] (V.south)  |- (wsum.east);
-
-% ── Proj + add ────────────────────────────────────────────────────────────────
-\node[box,     below=of wsum]  (proj) {Conv $1{\times}1$\\\footnotesize proj\\\tiny\texttt{:132}};
-\node[addcirc, below=of proj]  (add)  {$\oplus$};
-\node[box,     below=of add]   (out)  {output};
-
-\draw[arr] (wsum) -- (proj);
-\draw[arr] (proj) -- (add);
-\draw[arr] (add)  -- (out);
-
-% ── Residual bypass ──────────────────────────────────────────────────────────
-\coordinate (br) at ($(x.east)+(1.1,0)$);
-\coordinate (br_bot) at ($(add.east)+(1.1,0)$);
-\draw[-{Stealth[length=4pt]}, thick, dashed, draw=gray!60]
-      (x.east) -- (br) -- (br_bot) -- (add.east);
-\node[font=\footnotesize, text=gray!80, right=0.05cm of br, yshift=-0.3cm] {residual};
-
+% ── Residual skip (above, x → add) ───────────────────────────────────────────
+\coordinate (sr1) at ($(x.north)+(0,0.42)$);
+\coordinate (sr2) at ($(add.north)+(0,0.42)$);
+\draw[darr] (x.north) -- (sr1) -- (sr2) -- (add.north);
+\node[font=\tiny, text=gray!70] at ($(sr1)!0.5!(sr2)+(0,0.18)$) {residual};
 \end{tikzpicture}
-\caption{Self-attention block (\texttt{models/ddpm.py : AttentionBlock}, line~119). GroupNorm (line~130) $\to$ single \texttt{to\_qkv} Conv\,$1{\times}1$ (line~131) splits into $Q$/$K$/$V$ $\to$ scaled dot-product attention (lines~150--151) $\to$ \texttt{proj} Conv\,$1{\times}1$ (line~132) $\to$ residual add (line~156). Applied only at $16{\times}16$ resolution; see \texttt{AttentionBlock.forward} (line~135).}
+\caption{Self-attention block (\texttt{models/ddpm.py : AttentionBlock}, line~119). GN (line~130) $\to$ \texttt{to\_qkv} Conv\,$1{\times}1$ (line~131) splits into $Q$/$K$/$V$ $\to$ scaled dot-product $QK^T\!/\!\sqrt{C}$ (line~150) $\to$ Softmax (line~151) $\to$ $A{\cdot}V$ weighted sum (line~153) $\to$ \texttt{proj} (line~132) $\to$ residual add (line~156). $V$ bypasses the score path (dashed arc). Applied at $16{\times}16$ only; see \texttt{AttentionBlock.forward} (line~135).}
 \label{fig:self-attn}
 \end{figure}
 
@@ -693,10 +658,26 @@ The model is trained on a simplified loss derived from the variational lower bou
 The full training procedure is given in Figure~\ref{fig:training-alg}, and a single training step is illustrated in Figure~\ref{fig:training-step}.
 
 \begin{figure}[H]
-    \centering
-    \includegraphics[width=0.65\linewidth]{10000000000001D1000000DEF57E96FE.jpg}
-    \caption{Training Algorithm 1 (Ho et al.\ 2020)}
-    \label{fig:training-alg}
+\centering
+\begin{minipage}{0.72\linewidth}
+{\small
+\noindent\textbf{Algorithm 1} \; Training \hfill \textit{Ho et al., 2020}\\
+\rule{\linewidth}{0.5pt}\\[3pt]
+\begin{tabbing}
+\quad\=\quad\quad\=\kill
+\textbf{repeat}\\
+\> $x_0 \sim q(x_0)$\\
+\> $t \sim \mathrm{Uniform}(\{1,\ldots,T\})$\\
+\> $\varepsilon \sim \mathcal{N}(0,\,I)$\\
+\> Take gradient descent step on\\
+\>\> $\nabla_\theta \bigl\|\,\varepsilon - \varepsilon_\theta\!\bigl(\sqrt{\bar\alpha_t}\,x_0 + \sqrt{1-\bar\alpha_t}\,\varepsilon,\;t\bigr)\bigr\|^2$\\[2pt]
+\textbf{until} converged\\
+\end{tabbing}
+\rule{\linewidth}{0.5pt}
+}
+\end{minipage}
+\caption{Training Algorithm 1 (Ho et al.\ 2020, Eq.~14). At each step: sample a real image $x_0$, a random timestep $t$, and noise $\varepsilon$; then minimise the simple MSE loss between true and predicted noise.}
+\label{fig:training-alg}
 \end{figure}
 
 \begin{figure}[H]
@@ -726,10 +707,25 @@ x_{t-1} = \frac{1}{\sqrt{\alpha_t}}\!\left(x_t - \frac{1-\alpha_t}{\sqrt{1-\bar{
 \]
 
 \begin{figure}[H]
-    \centering
-    \includegraphics[width=0.65\linewidth]{10000000000001D3000000E170B47640.jpg}
-    \caption{Sampling Algorithm 2 (Ho et al.\ 2020)}
-    \label{fig:sampling-alg}
+\centering
+\begin{minipage}{0.82\linewidth}
+{\small
+\noindent\textbf{Algorithm 2} \; Sampling \hfill \textit{Ho et al., 2020}\\
+\rule{\linewidth}{0.5pt}\\[3pt]
+\begin{tabbing}
+\quad\=\quad\quad\=\kill
+$x_T \sim \mathcal{N}(0,\,I)$\\
+\textbf{for} $t = T,\,T{-}1,\ldots,1$ \textbf{do}\\
+\> $z \sim \mathcal{N}(0,I)$ \; if $t > 1$, \; else $z = \mathbf{0}$\\
+\> $\displaystyle x_{t-1} = \frac{1}{\sqrt{\alpha_t}}\!\left(x_t - \frac{1-\alpha_t}{\sqrt{1-\bar{\alpha}_t}}\,\varepsilon_\theta(x_t,\,t)\right) + \sigma_t\,z$\\[8pt]
+\textbf{end for}\\
+\textbf{return} $x_0$\\
+\end{tabbing}
+\rule{\linewidth}{0.5pt}
+}
+\end{minipage}
+\caption{Sampling Algorithm 2 (Ho et al.\ 2020). Starting from pure Gaussian noise $x_T$, iteratively denoise for 1000 steps. Each step subtracts the U-Net's predicted noise scaled by the schedule, then adds controlled stochasticity $\sigma_t z$.}
+\label{fig:sampling-alg}
 \end{figure}
 
 \begin{figure}[H]
@@ -987,6 +983,7 @@ The VAE and DDPM represent two different philosophies in generative modeling. Th
 
 In practice, these two ideas have converged. Latent Diffusion Models (the architecture behind Stable Diffusion) use a VAE to compress images into a compact latent space, then run the diffusion process in that compressed space. This combines the high-quality generation of DDPM with the computational efficiency of operating in a lower-dimensional space.
 
+\newpage
 % ============================================================
 \section{Conclusion}
 % ============================================================

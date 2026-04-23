@@ -2,28 +2,19 @@
 
 From-scratch implementations of **VAE** and **DDPM**, trained and evaluated on MNIST and CIFAR-10.
 
-| Model | Dataset | FID ↓ | IS ↑ | Evaluation Samples | Epochs |
-|-------|---------|-------|------|------------| ----------|
-| ConvVAE | CIFAR-10 | 160.76 | 3.02 ± 0.08 | 5,000 | 5,000 |
-| DDPM  | CIFAR-10 | 25.75 | 7.63 ± 0.42 | 5,000 | 274 (best ckpt) |
-| (DDPM) Paper | CIFAR-10 | 3.17 | 9.46 ± 0.11 | 50,000 | 2,050 |
-
+> For the full quantitative + qualitative analysis, architectural comparison, and conclusions see the **[PDF report](latex/report.pdf)**. The LaTeX source is at [`latex/report.tex`](latex/report.tex).
 
 ---
 
-## Quick Results
+## Results
 
-> For the full quantitative + qualitative analysis, architectural comparison, and conclusions see the **[PDF report](latex/report.pdf)** (`latex/report.pdf`). The LaTeX source is at [`latex/report.tex`](latex/report.tex).
-
-### Quantitative
-
-| Model | Dataset | FID ↓ | IS ↑ | Eval samples | Epochs trained |
-|-------|---------|------:|-----:|:------------:|:--------------:|
+| Model | Dataset | FID ↓ | IS ↑ | Eval samples | Epochs |
+|-------|---------|------:|-----:|:------------:|:------:|
 | ConvVAE | CIFAR-10 | 160.76 | 3.02 ± 0.08 | 5,000 | 5,000 |
-| DDPM | CIFAR-10 | **25.75** | **7.63 ± 0.42** | 5,000 | 274 (best ckpt) |
-| DDPM (paper) | CIFAR-10 | 3.17 | 9.46 ± 0.11 | — | 2,050 |
+| DDPM (ours) | CIFAR-10 | **25.75** | **7.63 ± 0.42** | 5,000 | 274 (best ckpt) |
+| DDPM (paper) | CIFAR-10 | 3.17 | 9.46 ± 0.11 | 50,000 | 2,050 |
 
-Evaluated on best checkpoint (epoch 274). The gap to the paper's FID 3.17 is expected — the paper trains to 2,050 epochs with 50 k evaluation samples.
+The gap to the paper's FID 3.17 is expected — the paper trains to 2,050 epochs and evaluates on 50 k samples.
 
 ---
 
